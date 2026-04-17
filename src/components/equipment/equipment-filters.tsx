@@ -21,6 +21,8 @@ export function EquipmentFilters({ types }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchValue, setSearchValue] = useState(searchParams.get("search") || "");
+  const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "all");
+  const [typeFilter, setTypeFilter] = useState(searchParams.get("type") || "all");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const updateParams = useCallback(
@@ -53,8 +55,8 @@ export function EquipmentFilters({ types }: Props) {
         className="sm:w-64"
       />
       <Select
-        defaultValue={searchParams.get("status") || "all"}
-        onValueChange={(v) => updateParams("status", v ?? "all")}
+        value={statusFilter}
+        onValueChange={(v) => { const val = v ?? "all"; setStatusFilter(val); updateParams("status", val); }}
       >
         <SelectTrigger className="sm:w-40">
           <SelectValue placeholder="상태" />
@@ -69,11 +71,15 @@ export function EquipmentFilters({ types }: Props) {
         </SelectContent>
       </Select>
       <Select
-        defaultValue={searchParams.get("type") || "all"}
-        onValueChange={(v) => updateParams("type", v ?? "all")}
+        value={typeFilter}
+        onValueChange={(v) => { const val = v ?? "all"; setTypeFilter(val); updateParams("type", val); }}
       >
         <SelectTrigger className="sm:w-40">
-          <SelectValue placeholder="유형" />
+          <SelectValue placeholder="유형">
+            {typeFilter !== "all"
+              ? types.find((t) => t.id === typeFilter)?.name
+              : undefined}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">전체 유형</SelectItem>

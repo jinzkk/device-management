@@ -224,6 +224,47 @@ echo "https://text-view.vercel.app" | vercel env add NEXT_PUBLIC_APP_URL product
 
 ---
 
+## [Bug #5] 장비 목록 필터 - Select 비제어→제어 전환 오류 및 유형 UUID 표시
+
+**증상:** 상태/유형 필터 드롭다운 선택 시 콘솔 오류 발생, 유형 선택 후 드롭다운에 이름 대신 UUID 표시
+```
+Base UI: A component is changing the default value state of an uncontrolled Select after being initialized.
+Base UI: A component is changing the uncontrolled value state of Select to be controlled.
+```
+**파일:** `src/components/equipment/equipment-filters.tsx`  
+**원인:**
+1. `defaultValue` 사용으로 비제어 컴포넌트로 초기화된 후 Next.js 클라이언트 라우팅 시 searchParams 변경으로 `defaultValue`를 재설정하려 해 Base UI 경고 발생
+2. `value={searchParams.get(...)}` 직접 사용 시 Next.js Suspense 전환 중 일시적으로 `undefined`가 되어 비제어→제어 전환 경고 발생
+3. Base UI 포탈 렌더링으로 인해 `SelectValue`가 UUID를 label로 매핑하지 못해 UUID 직접 표시
+
+**수정:**
+```tsx
+// Before (비제어 - 오류 발생)
+<Select defaultValue={searchParams.get("status") || "all"} ...>
+
+// After (제어 - useState로 안정적인 초기값 보장)
+const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "all");
+const [typeFilter, setTypeFilter] = useState(searchParams.get("type") || "all");
+
+<Select
+  value={statusFilter}
+  onValueChange={(v) => { const val = v ?? "all"; setStatusFilter(val); updateParams("status", val); }}
+>
+
+// 유형 SelectValue에 명시적 레이블 전달 (Bug #1과 동일한 패턴)
+<SelectValue placeholder="유형">
+  {typeFilter !== "all"
+    ? types.find((t) => t.id === typeFilter)?.name
+    : undefined}
+</SelectValue>
+```
+
+**검증 (Playwright):**
+- 상태 필터 "사용가능" 선택 → URL `?status=사용가능`, 드롭다운 "사용가능" 표시, 콘솔 오류 0건 ✅
+- 유형 필터 "노트북" 선택 → URL `?type=UUID`, 드롭다운 "노트북" 표시, 콘솔 오류 0건 ✅
+
+---
+
 ## 전체 테스트 결과 요약
 
 | 단계 | 항목 | 결과 |

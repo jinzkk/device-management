@@ -234,6 +234,10 @@ https://text-view.vercel.app
 | 배포 URL | https://text-view.vercel.app |
 | Vercel 대시보드 | https://vercel.com/jinzkk/text-view |
 
+### 14단계: 필터 드롭다운 버그 수정 -- ✅ 완료 (Playwright 검증 완료)
+- [x] `src/components/equipment/equipment-filters.tsx` — 상태/유형 Select `defaultValue` → `useState` + `value` 전환 (Base UI 비제어→제어 경고 해결)
+- [x] 유형 `SelectValue`에 명시적 레이블 전달 (`types.find()`) — UUID 직접 표시 버그 수정
+
 ---
 
 ## 남은 작업
