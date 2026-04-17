@@ -80,7 +80,7 @@ export function EquipmentForm({ mode, types, defaultValues }: Props) {
         toast.error("등록에 실패했습니다");
         return;
       }
-      toast.success("장비가 등록되었습니다");
+      toast.success("장비가 등록되었습니다", { description: values.name });
     } else {
       const { error } = await supabase
         .from("equipment")
@@ -90,7 +90,7 @@ export function EquipmentForm({ mode, types, defaultValues }: Props) {
         toast.error("수정에 실패했습니다");
         return;
       }
-      toast.success("장비가 수정되었습니다");
+      toast.success("장비가 수정되었습니다", { description: values.name });
     }
     router.push("/equipment");
     router.refresh();

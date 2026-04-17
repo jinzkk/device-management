@@ -167,6 +167,63 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGci...
 
 ---
 
+## [배포] GitHub 푸쉬 및 Vercel 배포
+
+### Git 푸쉬
+
+**파일:** `.gitignore`  
+**수정:** Playwright 캡처 파일 및 Claude Code 설정 파일 제외 추가:
+```
+.playwright-mcp/
+.claude/
+```
+
+**결과:** `git add -A` → `git commit` → `git push origin master`  
+레포: https://github.com/jinzkk/device-management ✅
+
+---
+
+### Vercel 배포 - 빌드 실패 (1차)
+
+**증상:** `npx vercel` 첫 배포 시 빌드 오류:
+```
+Error: @supabase/ssr: Your project's URL and API key are required to create a Supabase client!
+Export encountered an error on /login/page: /login, exiting the build.
+```
+**원인:** `.env.local`은 git에서 제외되므로 Vercel 빌드 환경에 환경변수가 없음.  
+**해결:** Vercel CLI로 환경변수 4개 추가:
+```bash
+echo "https://dfxywwukkczwirnhgdqb.supabase.co" | vercel env add NEXT_PUBLIC_SUPABASE_URL production
+echo "sb_publishable_..." | vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY production
+echo "eyJhbGci..." | vercel env add SUPABASE_SERVICE_ROLE_KEY production
+echo "https://text-view.vercel.app" | vercel env add NEXT_PUBLIC_APP_URL production
+```
+
+### Vercel 배포 - 성공 (2차)
+
+**명령:** `npx vercel --prod`  
+**결과:** 빌드 성공, 전체 라우트 정상 생성 ✅
+```
+○ /login
+ƒ /equipment, /equipment/[id], /equipment/[id]/edit ...
+ƒ /qr/[qrCodeId]
+ƒ Proxy (Middleware)
+```
+**배포 URL:** https://text-view.vercel.app
+
+---
+
+### Supabase Auth URL 설정
+
+**경로:** Supabase 대시보드 → Authentication → URL Configuration  
+**수정:**
+- Site URL: `http://localhost:3000` → `https://text-view.vercel.app`
+- Redirect URLs: `https://text-view.vercel.app/**` 추가
+
+**이유:** Supabase OAuth 콜백이 허용되지 않은 도메인으로 오면 로그인이 실패함 ✅
+
+---
+
 ## 전체 테스트 결과 요약
 
 | 단계 | 항목 | 결과 |
@@ -182,6 +239,12 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGci...
 | 9 | QR 코드 (SVG 렌더링, 스캔 리다이렉트) | ✅ (개선: 공개 읽기 전용 뷰 + 잘못된 QR 안내) |
 | 10 | 엑셀 내보내기 (API 응답, Content-Type) | ✅ |
 | 11 | 인증 (로그인, 로그아웃, 미인증 리다이렉트) | ✅ (Bug #4 수정 후) |
+| 12 | Git 푸쉬 (GitHub) | ✅ |
+| 13 | Vercel 배포 (프로덕션) | ✅ (환경변수 설정 후 2차 배포 성공) |
+| 14 | 로딩 스켈레톤 (equipment, equipment/[id]) | ✅ |
+| 15 | 에러 바운더리 (error.tsx, not-found.tsx) | ✅ |
+| 16 | 모바일 카드 레이아웃 (375px 검증) | ✅ |
+| 17 | 토스트 richColors + description 추가 | ✅ |
 
 **수정 파일 목록:**
 - `src/middleware.ts` → 삭제
@@ -191,4 +254,15 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGci...
 - `src/components/history/history-form-dialog.tsx` → Bug #3
 - `src/app/qr/[qrCodeId]/page.tsx` → Bug #4 + QR 공개 접근 개선
 - `src/lib/supabase/admin.ts` → 신규 생성 (service role 클라이언트)
+- `.gitignore` → `.playwright-mcp/`, `.claude/` 추가
 - `.env.local` → `SUPABASE_SERVICE_ROLE_KEY` 추가
+
+**[13단계 폴리싱]**
+- `src/app/equipment/loading.tsx` → 신규 (목록 스켈레톤)
+- `src/app/equipment/[id]/loading.tsx` → 신규 (상세 스켈레톤)
+- `src/app/not-found.tsx` → 신규 (글로벌 404)
+- `src/app/error.tsx` → 신규 (루트 에러 폴백)
+- `src/app/equipment/error.tsx` → 신규 (장비 영역 에러)
+- `src/components/equipment/equipment-table.tsx` → 모바일 카드 레이아웃 + toast description
+- `src/components/equipment/equipment-form.tsx` → 등록/수정 toast description 추가
+- `src/app/layout.tsx` → Toaster richColors, position, duration 설정

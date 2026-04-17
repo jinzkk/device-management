@@ -32,7 +32,7 @@ export default function RootLayout({
       <body className="min-h-full flex">
         <Providers>
           {children}
-          <Toaster />
+          <Toaster position="top-right" duration={3000} richColors />
         </Providers>
       </body>
     </html>
