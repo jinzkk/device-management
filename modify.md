@@ -273,7 +273,7 @@ const [typeFilter, setTypeFilter] = useState(searchParams.get("type") || "all");
 | 2 | Supabase DB (테이블, 시드 데이터) | ✅ |
 | 3 | Supabase 클라이언트 + 타입 (세션, 쿼리) | ✅ |
 | 4 | 레이아웃 (사이드바, 헤더, 모바일 반응형) | ✅ |
-| 5 | 장비 목록 (테이블, 검색, 필터, 드롭다운) | ✅ |
+| 5 | 장비 목록 (테이블, 검색, 필터, 드롭다운) | ✅ (Bug #5 수정 후) |
 | 6 | 장비 등록/수정 (Zod 유효성, CRUD) | ✅ (Bug #1 수정 후) |
 | 7 | 장비 상세 (정보 카드, 이력 탭) | ✅ |
 | 8 | 이력 Dialog (추가, 반납, 수정) | ✅ (Bug #3 수정 후) |
@@ -286,15 +286,24 @@ const [typeFilter, setTypeFilter] = useState(searchParams.get("type") || "all");
 | 15 | 에러 바운더리 (error.tsx, not-found.tsx) | ✅ |
 | 16 | 모바일 카드 레이아웃 (375px 검증) | ✅ |
 | 17 | 토스트 richColors + description 추가 | ✅ |
+| 18 | QR 인쇄 — 사이드바/헤더 제거, @page 여백 설정 | ✅ (Playwright 검증) |
+| 19 | 장비 사진 업로드 — Storage 연동, 미리보기, 상세 표시 | ✅ (Playwright 검증) |
+| 20 | loading.tsx Fragment key 누락 콘솔 오류 수정 | ✅ (Playwright 검증) |
+| 21 | 장비 상세 이미지 왜곡 수정 (object-cover → object-contain) | ✅ (Playwright 검증) |
 
 **수정 파일 목록:**
 - `src/middleware.ts` → 삭제
 - `src/proxy.ts` → 신규 생성 (middleware 대체)
-- `src/components/equipment/equipment-form.tsx` → Bug #1
-- `src/components/equipment/equipment-filters.tsx` → Bug #2
+- `src/components/equipment/equipment-form.tsx` → Bug #1, 사진 업로드 기능
+- `src/components/equipment/equipment-filters.tsx` → Bug #2, Bug #5
 - `src/components/history/history-form-dialog.tsx` → Bug #3
 - `src/app/qr/[qrCodeId]/page.tsx` → Bug #4 + QR 공개 접근 개선
 - `src/lib/supabase/admin.ts` → 신규 생성 (service role 클라이언트)
+- `src/lib/validators/equipment.ts` → image_url 필드 추가
+- `src/app/equipment/layout.tsx` → QR 인쇄 print:hidden
+- `src/components/equipment/qr-code-display.tsx` → @page 여백 + 인쇄 레이아웃
+- `src/app/equipment/[id]/page.tsx` → 장비 사진 표시, infoRows.map `&&` → 삼항 연산자 수정
+- `src/app/equipment/[id]/loading.tsx` → Fragment key 누락 수정 (Bug #6)
 - `.gitignore` → `.playwright-mcp/`, `.claude/` 추가
 - `.env.local` → `SUPABASE_SERVICE_ROLE_KEY` 추가
 
@@ -307,3 +316,121 @@ const [typeFilter, setTypeFilter] = useState(searchParams.get("type") || "all");
 - `src/components/equipment/equipment-table.tsx` → 모바일 카드 레이아웃 + toast description
 - `src/components/equipment/equipment-form.tsx` → 등록/수정 toast description 추가
 - `src/app/layout.tsx` → Toaster richColors, position, duration 설정
+
+---
+
+## [개선] QR 코드 인쇄 `@media print` CSS 최적화
+
+**파일:**
+- `src/app/equipment/layout.tsx`
+- `src/components/equipment/qr-code-display.tsx`
+
+**수정:**
+
+1. **`src/app/equipment/layout.tsx`** — Sidebar/Header에 `print:hidden` 래퍼 추가 및 `<main>` 패딩 `print:p-0`:
+```tsx
+<div className="print:hidden"><Sidebar /></div>
+<div className="flex flex-1 flex-col">
+  <div className="print:hidden"><Header /></div>
+  <main className="flex-1 p-4 md:p-6 print:p-0">{children}</main>
+</div>
+```
+
+2. **`src/components/equipment/qr-code-display.tsx`** — `@page` 여백 설정 + 인쇄 레이아웃:
+```tsx
+<style>{`@page { margin: 10mm; }`}</style>
+<div className="... print:flex print:items-center print:justify-center print:min-h-screen print:m-0">
+  // 카드 패딩 print:p-4, 텍스트 print:text-base / print:text-xs
+```
+
+---
+
+## [기능] 장비 사진 업로드 (Supabase Storage 연동)
+
+**파일:**
+- Supabase Storage (대시보드)
+- `src/lib/validators/equipment.ts`
+- `src/components/equipment/equipment-form.tsx`
+- `src/app/equipment/[id]/page.tsx`
+
+**수정:**
+
+1. **Supabase Storage** — `equipment-images` Public 버킷 생성, RLS 정책 추가:
+```sql
+CREATE POLICY "Auth upload equipment-images" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'equipment-images');
+CREATE POLICY "Auth update equipment-images" ON storage.objects FOR UPDATE TO authenticated USING (bucket_id = 'equipment-images');
+CREATE POLICY "Auth delete equipment-images" ON storage.objects FOR DELETE TO authenticated USING (bucket_id = 'equipment-images');
+```
+
+2. **`src/lib/validators/equipment.ts`** — `image_url` 필드 추가:
+```ts
+image_url: z.string().optional(),
+```
+
+3. **`src/components/equipment/equipment-form.tsx`** — 이미지 업로드 UI + 로직:
+- `useState<File | null>`, `useState<string | null>` 로 파일/미리보기 관리
+- hidden `<input type="file" accept="image/*">` + 커스텀 버튼
+- 미리보기 `w-32 h-32 object-cover` + 삭제 버튼
+- `onSubmit`에서 Storage 업로드 후 public URL을 payload의 `image_url`에 포함
+
+4. **`src/app/equipment/[id]/page.tsx`** — 장비 상세 카드 상단 이미지 표시:
+```tsx
+{eq.image_url && (
+  <img src={eq.image_url} alt={eq.name} className="w-full max-h-48 object-cover rounded-lg mb-4" />
+)}
+```
+
+---
+
+## [Bug #6] 장비 상세 로딩 스켈레톤 - Fragment key 누락 콘솔 오류
+
+**증상:** `/equipment/[id]` 및 `/equipment/[id]/qr` 접근 시 콘솔 오류 발생
+```
+Each child in a list should have a unique "key" prop.
+```
+**파일:** `src/app/equipment/[id]/loading.tsx`  
+**원인:** `Array.from({ length: 6 }).map()` 내부에서 `<>...</>` Fragment를 반환할 때 key 미지정. 내부 div에는 key가 있었으나 Fragment 자체에 key가 없어 React가 경고를 발생시킴.  
+**수정:** `<>` → `<Fragment key={i}>` 로 교체 및 `import { Fragment } from "react"` 추가:
+
+```tsx
+// Before
+{Array.from({ length: 6 }).map((_, i) => (
+  <>
+    <div key={`l-${i}`} className="h-4 w-20 animate-pulse rounded bg-muted" />
+    <div key={`v-${i}`} className="h-4 w-32 animate-pulse rounded bg-muted" />
+  </>
+))}
+
+// After
+{Array.from({ length: 6 }).map((_, i) => (
+  <Fragment key={i}>
+    <div className="h-4 w-20 animate-pulse rounded bg-muted" />
+    <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+  </Fragment>
+))}
+```
+
+**검증:** `/equipment/[id]`, `/equipment/[id]/qr` 진입 시 콘솔 오류 0건 ✅
+
+---
+
+## [Bug #7] 장비 상세 페이지 - 이미지 왜곡 표시
+
+**증상:** 장비 사진 등록 후 상세 페이지에서 이미지가 납작하게 왜곡됨
+- 원본 685×655px(비율 1.05)이 921×192px(비율 0.21)로 렌더링됨 — 약 4배 왜곡
+
+**파일:** `src/app/equipment/[id]/page.tsx`  
+**원인:** `w-full max-h-48 object-cover` 조합이 부모 전체 너비(921px)로 이미지를 강제 확장하고, 높이를 192px로 제한하면서 `object-cover`가 이미지를 크롭·왜곡함.
+
+**수정:**
+```tsx
+// Before
+<img className="w-full max-h-48 object-cover rounded-lg mb-4" />
+
+// After
+<div className="flex justify-center mb-4">
+  <img className="max-h-48 max-w-full object-contain rounded-lg" />
+</div>
+```
+
+**검증:** 렌더링 비율 0.21 → 1.05 (원본과 동일), 콘솔 오류 0건 ✅

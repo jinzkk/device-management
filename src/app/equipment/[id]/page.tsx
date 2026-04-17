@@ -91,17 +91,25 @@ export default async function EquipmentDetailPage({ params }: Props) {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {eq.image_url && (
+              <div className="flex justify-center mb-4">
+                <img
+                  src={eq.image_url}
+                  alt={eq.name}
+                  className="max-h-48 max-w-full object-contain rounded-lg"
+                />
+              </div>
+            )}
             <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
-              {infoRows.map(
-                (row) =>
-                  row.value && (
-                    <div key={row.label} className="contents">
-                      <dt className="text-muted-foreground font-medium">
-                        {row.label}
-                      </dt>
-                      <dd>{row.value}</dd>
-                    </div>
-                  )
+              {infoRows.map((row) =>
+                row.value ? (
+                  <div key={row.label} className="contents">
+                    <dt className="text-muted-foreground font-medium">
+                      {row.label}
+                    </dt>
+                    <dd>{row.value}</dd>
+                  </div>
+                ) : null
               )}
             </dl>
           </CardContent>

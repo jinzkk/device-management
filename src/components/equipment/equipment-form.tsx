@@ -1,10 +1,12 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
+import { ImagePlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,6 +42,9 @@ interface Props {
 export function EquipmentForm({ mode, types, defaultValues }: Props) {
   const router = useRouter();
   const supabase = createClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(defaultValues?.image_url || null);
 
   const form = useForm<EquipmentFormValues>({
     resolver: zodResolver(equipmentSchema),
@@ -53,10 +58,38 @@ export function EquipmentForm({ mode, types, defaultValues }: Props) {
       purchase_price: defaultValues?.purchase_price?.toString() || "",
       status: defaultValues?.status || "사용가능",
       notes: defaultValues?.notes || "",
+      image_url: defaultValues?.image_url || "",
     },
   });
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setPreviewUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const onSubmit = async (values: EquipmentFormValues) => {
+    let imageUrl: string | null = previewUrl && !imageFile ? previewUrl : null;
+    if (imageFile) {
+      const ext = imageFile.name.split(".").pop();
+      const path = `${nanoid(10)}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("equipment-images")
+        .upload(path, imageFile, { contentType: imageFile.type });
+      if (uploadError) {
+        toast.error("이미지 업로드에 실패했습니다");
+        return;
+      }
+      imageUrl = supabase.storage.from("equipment-images").getPublicUrl(path).data.publicUrl;
+    }
+
     const payload = {
       name: values.name,
       type_id: values.type_id,
@@ -69,6 +102,7 @@ export function EquipmentForm({ mode, types, defaultValues }: Props) {
         : null,
       status: values.status,
       notes: values.notes || null,
+      image_url: imageUrl,
     };
 
     if (mode === "create") {
@@ -253,6 +287,42 @@ export function EquipmentForm({ mode, types, defaultValues }: Props) {
             </FormItem>
           )}
         />
+
+        <div className="space-y-2">
+          <p className="text-sm font-medium">장비 사진</p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          {previewUrl ? (
+            <div className="relative w-32 h-32">
+              <img
+                src={previewUrl}
+                alt="장비 사진"
+                className="w-32 h-32 object-cover rounded-lg border"
+              />
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <ImagePlus className="mr-2 h-4 w-4" />
+              사진 선택
+            </Button>
+          )}
+        </div>
 
         <div className="flex gap-3">
           <Button type="submit" disabled={form.formState.isSubmitting}>

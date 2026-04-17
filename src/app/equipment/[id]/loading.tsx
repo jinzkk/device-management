@@ -1,3 +1,5 @@
+import { Fragment } from "react";
+
 export default function EquipmentDetailLoading() {
   return (
     <div className="space-y-6">
@@ -17,10 +19,10 @@ export default function EquipmentDetailLoading() {
         </div>
         <div className="border-t pt-4 grid grid-cols-[auto_1fr] gap-x-6 gap-y-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <>
-              <div key={`l-${i}`} className="h-4 w-20 animate-pulse rounded bg-muted" />
-              <div key={`v-${i}`} className="h-4 w-32 animate-pulse rounded bg-muted" />
-            </>
+            <Fragment key={i}>
+              <div className="h-4 w-20 animate-pulse rounded bg-muted" />
+              <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+            </Fragment>
           ))}
         </div>
       </div>

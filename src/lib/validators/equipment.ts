@@ -10,6 +10,7 @@ export const equipmentSchema = z.object({
   purchase_price: z.string().optional(),
   status: z.enum(["사용가능", "사용중", "수리중", "폐기"]),
   notes: z.string().optional(),
+  image_url: z.string().optional(),
 });
 
 export type EquipmentFormValues = z.infer<typeof equipmentSchema>;
